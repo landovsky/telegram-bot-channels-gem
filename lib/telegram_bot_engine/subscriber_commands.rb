@@ -37,7 +37,7 @@ module TelegramBotEngine
 
     # /help - list all available commands
     def help!(*)
-      respond_with :message, text: "Available Commands\n\n#{available_commands_text}"
+      respond_with :message, text: "📋 *Available Commands*\n\n#{available_commands_text}", parse_mode: "Markdown"
     end
 
     private
