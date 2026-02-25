@@ -5,6 +5,7 @@ module TelegramBotEngine
     extend ActiveSupport::Concern
 
     included do
+      skip_forgery_protection if respond_to?(:skip_forgery_protection)
       before_action :authorize_user!
     end
 

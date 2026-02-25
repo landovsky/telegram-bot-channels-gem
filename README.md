@@ -89,8 +89,34 @@ end
 
 ### Set webhook
 
+These rake tasks come from the `telegram-bot` gem:
+
 ```bash
-bin/rails telegram:bot:set_webhook
+# Register your app's URL with Telegram so it sends updates to your server
+bin/rails telegram:bot:set_webhook RAILS_ENV=production
+
+# Remove the webhook (e.g. before switching to polling)
+bin/rails telegram:bot:delete_webhook
+
+# Run a local poller for development (no webhook needed)
+bin/rails telegram:bot:poller
+```
+
+The webhook URL is derived from your Rails routes (`telegram_webhook` route helper). Make sure your production server is accessible via HTTPS before setting the webhook.
+
+For local development with ngrok, configure `default_url_options` in `config/environments/development.rb`:
+
+```ruby
+if ENV['HOST'].present?
+  routes.default_url_options[:host] = ENV.fetch("HOST", "localhost:3000")
+  routes.default_url_options[:protocol] = ENV.fetch("PROTOCOL", "https")
+end
+```
+
+Then run:
+
+```bash
+HOST=your-subdomain.ngrok-free.app bin/rails telegram:bot:set_webhook
 ```
 
 ## Usage
