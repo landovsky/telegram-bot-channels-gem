@@ -8,7 +8,7 @@ class CreateTelegramBotEngineSubscriptions < ActiveRecord::Migration[7.0]
       t.string :username
       t.string :first_name
       t.boolean :active, default: true
-      t.json :metadata, default: {}
+      t.jsonb :metadata, default: {}
 
       t.timestamps
     end
