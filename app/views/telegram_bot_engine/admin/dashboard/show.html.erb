@@ -1,0 +1,41 @@
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+</div>
+
+<% if @bot_username %>
+  <div class="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Bot</h2>
+    <p class="text-lg font-semibold text-gray-900">@<%= @bot_username %></p>
+    <a href="https://t.me/<%= @bot_username %>" target="_blank" rel="noopener"
+       class="text-sm text-blue-600 hover:text-blue-800">
+      t.me/<%= @bot_username %>
+    </a>
+  </div>
+<% end %>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Subscriptions</h3>
+    <p class="mt-2 text-3xl font-bold text-gray-900"><%= @total_subscriptions %></p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Active</h3>
+    <p class="mt-2 text-3xl font-bold text-green-600"><%= @active_subscriptions %></p>
+  </div>
+
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Inactive</h3>
+    <p class="mt-2 text-3xl font-bold text-gray-400"><%= @inactive_subscriptions %></p>
+  </div>
+</div>
+
+<div class="flex space-x-4">
+  <%= link_to "Manage Subscriptions", telegram_bot_engine.admin_subscriptions_path,
+        class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+
+  <% if TelegramBotEngine.config.allowed_usernames == :database %>
+    <%= link_to "Manage Allowlist", telegram_bot_engine.admin_allowlist_index_path,
+          class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+  <% end %>
+</div>
