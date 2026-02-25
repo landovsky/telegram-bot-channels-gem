@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Bot Engine Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <%= csrf_meta_tags %>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <nav class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center space-x-8">
+          <span class="text-xl font-bold text-gray-900">Telegram Bot Engine</span>
+          <div class="flex space-x-4">
+            <%= link_to "Dashboard", telegram_bot_engine.admin_dashboard_path,
+                  class: "px-3 py-2 rounded-md text-sm font-medium #{request.path == telegram_bot_engine.admin_dashboard_path || request.path == telegram_bot_engine.admin_root_path ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
+            <%= link_to "Subscriptions", telegram_bot_engine.admin_subscriptions_path,
+                  class: "px-3 py-2 rounded-md text-sm font-medium #{request.path.include?('subscriptions') ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
+            <% if TelegramBotEngine.config.allowed_usernames == :database %>
+              <%= link_to "Allowlist", telegram_bot_engine.admin_allowlist_index_path,
+                    class: "px-3 py-2 rounded-md text-sm font-medium #{request.path.include?('allowlist') ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <% if notice %>
+      <div class="mb-4 p-4 rounded-md bg-green-50 border border-green-200">
+        <p class="text-sm text-green-800"><%= notice %></p>
+      </div>
+    <% end %>
+
+    <% if alert %>
+      <div class="mb-4 p-4 rounded-md bg-red-50 border border-red-200">
+        <p class="text-sm text-red-800"><%= alert %></p>
+      </div>
+    <% end %>
+
+    <%= yield %>
+  </main>
+</body>
+</html>

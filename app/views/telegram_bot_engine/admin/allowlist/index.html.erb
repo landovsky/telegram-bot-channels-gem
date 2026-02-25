@@ -1,0 +1,71 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Allowlist</h1>
+  <p class="mt-1 text-sm text-gray-500">Manage authorized Telegram usernames</p>
+</div>
+
+<div class="mb-6 bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+  <h2 class="text-sm font-medium text-gray-700 mb-4">Add Username</h2>
+  <%= form_with url: telegram_bot_engine.admin_allowlist_index_path, method: :post, class: "flex items-end space-x-4" do |f| %>
+    <div class="flex-1">
+      <label for="allowed_user_username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+      <input type="text" name="allowed_user[username]" id="allowed_user_username" required
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border"
+             placeholder="telegram_username">
+    </div>
+    <div class="flex-1">
+      <label for="allowed_user_note" class="block text-sm font-medium text-gray-700 mb-1">Note (optional)</label>
+      <input type="text" name="allowed_user[note]" id="allowed_user_note"
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border"
+             placeholder="e.g. Tom - developer">
+    </div>
+    <div>
+      <button type="submit"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+        Add
+      </button>
+    </div>
+  <% end %>
+</div>
+
+<div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+  <table class="min-w-full divide-y divide-gray-200">
+    <thead class="bg-gray-50">
+      <tr>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
+        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
+        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="bg-white divide-y divide-gray-200">
+      <% @allowed_users.each do |user| %>
+        <tr>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            @<%= user.username %>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <%= user.note || "-" %>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <%= user.created_at.strftime("%Y-%m-%d %H:%M") %>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+            <%= button_to "Remove",
+                  telegram_bot_engine.admin_allowlist_path(user),
+                  method: :delete,
+                  data: { turbo_confirm: "Remove @#{user.username} from the allowlist?" },
+                  class: "inline-flex items-center px-3 py-1.5 border border-red-300 rounded text-xs font-medium text-red-700 bg-white hover:bg-red-50" %>
+          </td>
+        </tr>
+      <% end %>
+
+      <% if @allowed_users.empty? %>
+        <tr>
+          <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-500">
+            No usernames in the allowlist yet.
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
