@@ -85,6 +85,16 @@ RSpec.describe TelegramBotEngine::SubscriberCommands do
       expect(text).to include("/stop")
       expect(text).to include("/help")
     end
+
+    it "logs a start event" do
+      controller.start!
+
+      event = TelegramBotEngine::Event.last
+      expect(event.event_type).to eq("command")
+      expect(event.action).to eq("start")
+      expect(event.chat_id).to eq(99999)
+      expect(event.username).to eq("alice")
+    end
   end
 
   describe "#stop!" do
@@ -108,6 +118,16 @@ RSpec.describe TelegramBotEngine::SubscriberCommands do
 
       expect(controller.responses.first[:text]).to include("unsubscribed")
     end
+
+    it "logs a stop event" do
+      create(:subscription, chat_id: 99999)
+      controller.stop!
+
+      event = TelegramBotEngine::Event.last
+      expect(event.event_type).to eq("command")
+      expect(event.action).to eq("stop")
+      expect(event.chat_id).to eq(99999)
+    end
   end
 
   describe "#help!" do
@@ -121,6 +141,14 @@ RSpec.describe TelegramBotEngine::SubscriberCommands do
       expect(text).to include("/stop")
       expect(text).to include("/help")
       expect(text).to include("/custom")
+    end
+
+    it "logs a help event" do
+      controller.help!
+
+      event = TelegramBotEngine::Event.last
+      expect(event.event_type).to eq("command")
+      expect(event.action).to eq("help")
     end
   end
 
@@ -148,6 +176,15 @@ RSpec.describe TelegramBotEngine::SubscriberCommands do
         }.to throw_symbol(:abort)
 
         expect(controller.responses.first[:text]).to eq(TelegramBotEngine.config.unauthorized_message)
+      end
+
+      it "logs an auth_failure event" do
+        catch(:abort) { controller.send(:authorize_user!) }
+
+        event = TelegramBotEngine::Event.last
+        expect(event.event_type).to eq("auth_failure")
+        expect(event.action).to eq("unauthorized")
+        expect(event.username).to eq("eve")
       end
     end
   end

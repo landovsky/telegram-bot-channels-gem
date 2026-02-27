@@ -39,6 +39,17 @@ RSpec.describe TelegramBotEngine::DeliveryJob do
       described_class.new.perform(12345, "Test", { "parse_mode" => "HTML" })
     end
 
+    it "logs a delivered event" do
+      allow(bot_client).to receive(:send_message)
+
+      described_class.new.perform(12345, "Hello!")
+
+      event = TelegramBotEngine::Event.last
+      expect(event.event_type).to eq("delivery")
+      expect(event.action).to eq("delivered")
+      expect(event.chat_id).to eq(12345)
+    end
+
     context "when user blocked the bot" do
       before do
         allow(bot_client).to receive(:send_message).and_raise(Telegram::Bot::Forbidden, "bot was blocked")
@@ -55,6 +66,16 @@ RSpec.describe TelegramBotEngine::DeliveryJob do
 
       it "handles missing subscription gracefully" do
         expect { described_class.new.perform(99999, "Hello!") }.not_to raise_error
+      end
+
+      it "logs a blocked event" do
+        create(:subscription, chat_id: 12345, active: true)
+        described_class.new.perform(12345, "Hello!")
+
+        event = TelegramBotEngine::Event.last
+        expect(event.event_type).to eq("delivery")
+        expect(event.action).to eq("blocked")
+        expect(event.chat_id).to eq(12345)
       end
     end
   end

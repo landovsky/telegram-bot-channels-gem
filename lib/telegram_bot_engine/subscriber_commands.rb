@@ -22,6 +22,11 @@ module TelegramBotEngine
       )
       subscription.save!
 
+      TelegramBotEngine::Event.log(
+        event_type: "command", action: "start",
+        chat_id: chat["id"], username: from["username"]
+      )
+
       welcome = TelegramBotEngine.config.welcome_message % {
         username: from["first_name"] || from["username"],
         commands: available_commands_text
@@ -33,11 +38,22 @@ module TelegramBotEngine
     def stop!(*)
       subscription = TelegramBotEngine::Subscription.find_by(chat_id: chat["id"])
       subscription&.update(active: false)
+
+      TelegramBotEngine::Event.log(
+        event_type: "command", action: "stop",
+        chat_id: chat["id"], username: from["username"]
+      )
+
       respond_with :message, text: "You've been unsubscribed. Send /start to resubscribe."
     end
 
     # /help - list all available commands
     def help!(*)
+      TelegramBotEngine::Event.log(
+        event_type: "command", action: "help",
+        chat_id: chat["id"], username: from["username"]
+      )
+
       respond_with :message, text: "📋 *Available Commands*\n\n#{available_commands_text}", parse_mode: "Markdown"
     end
 
@@ -45,6 +61,11 @@ module TelegramBotEngine
 
     def authorize_user!
       return if TelegramBotEngine::Authorizer.authorized?(from["username"])
+
+      TelegramBotEngine::Event.log(
+        event_type: "auth_failure", action: "unauthorized",
+        chat_id: chat["id"], username: from["username"]
+      )
 
       respond_with :message, text: TelegramBotEngine.config.unauthorized_message
       throw :abort

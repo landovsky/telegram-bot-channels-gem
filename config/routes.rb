@@ -6,5 +6,6 @@ TelegramBotEngine::Engine.routes.draw do
     get "dashboard", to: "dashboard#show", as: :dashboard
     resources :subscriptions, only: %i[index update destroy]
     resources :allowlist, only: %i[index create destroy]
+    resources :events, only: %i[index]
   end
 end
