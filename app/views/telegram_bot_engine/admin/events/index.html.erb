@@ -79,8 +79,8 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
             <%= event.chat_id || "-" %>
           </td>
-          <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="<%= event.details.to_json %>">
-            <%= event.details.present? ? event.details.to_json.truncate(80) : "-" %>
+          <td class="px-6 py-4 text-gray-500 max-w-md break-words" style="font-size: 0.7rem; line-height: 1.15rem;">
+            <%= event.details.present? ? event.details.to_json : "-" %>
           </td>
         </tr>
       <% end %>
