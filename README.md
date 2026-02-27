@@ -53,6 +53,10 @@ TelegramBotEngine.configure do |config|
   # Optional: custom messages
   # config.unauthorized_message = "Sorry, you're not authorized to use this bot."
   # config.welcome_message = "Welcome %{username}! Available commands:\n%{commands}"
+
+  # Event logging — logs commands, deliveries, auth failures to the database
+  # config.event_logging = true          # default: true
+  # config.event_retention_days = 30     # default: 30, auto-purges older events
 end
 ```
 
@@ -149,6 +153,35 @@ When mounted, the engine provides a web interface for:
 - **Dashboard** — bot info, subscription counts
 - **Subscriptions** — list, activate/deactivate, delete
 - **Allowlist** — add/remove usernames (when `config.allowed_usernames = :database`)
+- **Events** — browsable log of commands, deliveries, and auth failures with filtering by type, action, and chat ID
+
+### Event log
+
+The engine automatically logs operational events to the `telegram_bot_engine_events` table:
+
+| Event type | Actions | When |
+|---|---|---|
+| `command` | `start`, `stop`, `help` | User sends a bot command |
+| `delivery` | `broadcast`, `notify`, `delivered`, `blocked` | Messages are queued or delivered |
+| `auth_failure` | `unauthorized` | Unauthorized user attempts a command |
+
+Events are viewable in the admin UI and can be queried directly:
+
+```ruby
+# Recent command events
+TelegramBotEngine::Event.by_type("command").recent.limit(20)
+
+# Deliveries to a specific chat
+TelegramBotEngine::Event.by_type("delivery").by_chat_id(123456789)
+
+# Events in the last 24 hours
+TelegramBotEngine::Event.since(24.hours.ago)
+
+# Manual purge (automatic purge runs probabilistically)
+TelegramBotEngine::Event.purge_old!
+```
+
+Disable event logging entirely with `config.event_logging = false`.
 
 ## Requirements
 
