@@ -77,6 +77,56 @@ RSpec.describe TelegramBotEngine::Admin::EventsController, type: :controller do
       expect(response.body).to include("No events found")
     end
 
+    context "JSON format" do
+      it "responds with JSON" do
+        TelegramBotEngine::Event.create!(
+          event_type: "command", action: "start",
+          chat_id: 12345, username: "alice", details: { text: "hello" }
+        )
+
+        get :index, format: :json
+
+        expect(response).to be_successful
+        expect(response.content_type).to include("application/json")
+
+        body = JSON.parse(response.body)
+        expect(body["events"].length).to eq(1)
+        expect(body["events"][0]["event_type"]).to eq("command")
+        expect(body["events"][0]["action"]).to eq("start")
+        expect(body["events"][0]["chat_id"]).to eq(12345)
+        expect(body["events"][0]["username"]).to eq("alice")
+        expect(body["events"][0]["details"]).to eq("text" => "hello")
+        expect(body["events"][0]["created_at"]).to be_present
+        expect(body["meta"]["total_count"]).to eq(1)
+        expect(body["meta"]["page"]).to eq(1)
+        expect(body["meta"]["per_page"]).to eq(50)
+      end
+
+      it "filters by type" do
+        TelegramBotEngine::Event.create!(event_type: "command", action: "start")
+        TelegramBotEngine::Event.create!(event_type: "delivery", action: "broadcast")
+
+        get :index, format: :json, params: { type: "command" }
+
+        body = JSON.parse(response.body)
+        expect(body["events"].length).to eq(1)
+        expect(body["events"][0]["event_type"]).to eq("command")
+        expect(body["meta"]["total_count"]).to eq(1)
+      end
+
+      it "paginates" do
+        55.times { TelegramBotEngine::Event.create!(event_type: "command", action: "start") }
+
+        get :index, format: :json, params: { page: 2 }
+
+        body = JSON.parse(response.body)
+        expect(body["events"].length).to eq(5)
+        expect(body["meta"]["page"]).to eq(2)
+        expect(body["meta"]["total_pages"]).to eq(2)
+        expect(body["meta"]["total_count"]).to eq(55)
+      end
+    end
+
     context "when admin is disabled" do
       before do
         TelegramBotEngine.configure { |c| c.admin_enabled = false }
