@@ -6,6 +6,15 @@ module TelegramBotEngine
       PER_PAGE = 50
 
       def index
+        unless Event.table_exists?
+          @events = []
+          @total_count = 0
+          @page = 1
+          @total_pages = 0
+          flash.now[:alert] = "Events table not found. Run: rails telegram_bot_engine:install:migrations && rails db:migrate"
+          return
+        end
+
         @events = Event.recent
         @events = @events.by_type(params[:type]) if params[:type].present?
         @events = @events.by_action(params[:action_name]) if params[:action_name].present?

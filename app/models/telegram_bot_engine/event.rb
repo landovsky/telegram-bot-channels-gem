@@ -15,6 +15,7 @@ module TelegramBotEngine
 
     def self.log(event_type:, action:, chat_id: nil, username: nil, details: {})
       return unless TelegramBotEngine.config.event_logging
+      return unless table_exists?
 
       create!(
         event_type: event_type,
