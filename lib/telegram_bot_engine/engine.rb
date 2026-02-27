@@ -10,9 +10,9 @@ module TelegramBotEngine
 
     initializer "telegram_bot_engine.middleware" do |app|
       if app.config.api_only
-        app.middleware.use ActionDispatch::Cookies
-        app.middleware.use ActionDispatch::Session::CookieStore
-        app.middleware.use ActionDispatch::Flash
+        app.middleware.insert_before 0, ActionDispatch::Cookies
+        app.middleware.insert_after ActionDispatch::Cookies, ActionDispatch::Session::CookieStore
+        app.middleware.insert_after ActionDispatch::Session::CookieStore, ActionDispatch::Flash
       end
     end
   end
