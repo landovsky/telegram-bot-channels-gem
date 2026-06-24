@@ -38,6 +38,7 @@ RSpec.configure do |config|
         t.string  :slug, null: false
         t.string  :purpose
         t.string  :token, null: false
+        t.string  :webhook_id, null: false
         t.string  :webhook_secret, null: false
         t.boolean :active, default: true
         t.boolean :default, default: false
@@ -45,6 +46,7 @@ RSpec.configure do |config|
       end
 
       add_index :telegram_bot_engine_bots, :slug, unique: true
+      add_index :telegram_bot_engine_bots, :webhook_id, unique: true
       add_index :telegram_bot_engine_bots, :webhook_secret, unique: true
       add_index :telegram_bot_engine_bots, :active
 

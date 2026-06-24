@@ -20,7 +20,8 @@ MIGRATIONS = {
   "004_create_telegram_bot_engine_bots"              => "CreateTelegramBotEngineBots",
   "005_add_bot_to_telegram_bot_engine_subscriptions" => "AddBotToTelegramBotEngineSubscriptions",
   "006_add_bot_to_telegram_bot_engine_allowed_users" => "AddBotToTelegramBotEngineAllowedUsers",
-  "007_add_bot_to_telegram_bot_engine_events"        => "AddBotToTelegramBotEngineEvents"
+  "007_add_bot_to_telegram_bot_engine_events"        => "AddBotToTelegramBotEngineEvents",
+  "008_add_webhook_id_to_telegram_bot_engine_bots"   => "AddWebhookIdToTelegramBotEngineBots"
 }.each_with_object({}) do |(file, klass), h|
   require File.join(ROOT, "db", "migrate", file)
   h[klass] = Object.const_get(klass)
@@ -43,8 +44,28 @@ rescue ActiveRecord::StatementInvalid
   true
 end
 
-# --- forward: apply all migrations up ------------------------------------------------
-MIGRATIONS.each_value { |m| m.migrate(:up) }
+# --- forward: apply base tables, seed a legacy bot, then the Phase 2/3 migrations --------
+base = %w[
+  CreateTelegramBotEngineSubscriptions CreateTelegramBotEngineAllowedUsers
+  CreateTelegramBotEngineEvents CreateTelegramBotEngineBots
+]
+phase2_3 = %w[
+  AddBotToTelegramBotEngineSubscriptions AddBotToTelegramBotEngineAllowedUsers
+  AddBotToTelegramBotEngineEvents AddWebhookIdToTelegramBotEngineBots
+]
+
+base.each { |k| MIGRATIONS[k].migrate(:up) }
+
+# A bot row created BEFORE webhook_id existed — migration 008 must backfill it.
+conn.execute(
+  "INSERT INTO telegram_bot_engine_bots (name, slug, token, webhook_secret, active, \"default\", created_at, updated_at) " \
+  "VALUES ('Legacy', 'legacy', 'tok', 'sek', 1, 0, datetime('now'), datetime('now'))"
+)
+
+phase2_3.each { |k| MIGRATIONS[k].migrate(:up) }
+
+legacy_whid = conn.select_value("SELECT webhook_id FROM telegram_bot_engine_bots WHERE slug = 'legacy'")
+assert !legacy_whid.to_s.empty?, "migration 008 backfills webhook_id on a pre-existing (legacy) bot"
 
 subs = "telegram_bot_engine_subscriptions"
 allow = "telegram_bot_engine_allowed_users"

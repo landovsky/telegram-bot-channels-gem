@@ -20,6 +20,12 @@ RSpec.describe TelegramBotEngine::Bot do
       expect(bot.webhook_secret).to be_present
     end
 
+    it "auto-generates a distinct, non-secret webhook_id (routing id) decoupled from the secret" do
+      bot = described_class.create!(name: "X", slug: "x", token: "t")
+      expect(bot.webhook_id).to be_present
+      expect(bot.webhook_id).not_to eq(bot.webhook_secret)
+    end
+
     it "enforces a unique webhook_secret (it is an inbound routing key)" do
       create(:bot, webhook_secret: "shared")
       dup = build(:bot, webhook_secret: "shared")
@@ -113,6 +119,62 @@ RSpec.describe TelegramBotEngine::Bot do
       bot = create(:bot, :default)
       expect(bot.client).to be(bot.client)
       expect(bot.client).to be(TelegramBotEngine.client_for(bot))
+    end
+  end
+
+  describe "webhook auto-(un)registration on save/destroy (§3.6)" do
+    around { |example| Telegram::Bot::ClientStub.stub_all! { example.run } }
+
+    context "when a base_url is configured" do
+      before { TelegramBotEngine.configure { |c| c.webhook_base_url = "https://example.com" } }
+
+      it "registers the webhook (URL carries the non-secret webhook_id) when an active bot is saved" do
+        bot = create(:bot, :default, webhook_id: "wh")
+
+        expect(TelegramBotEngine.client_for(bot).requests[:setWebhook].last[:url])
+          .to eq("https://example.com/telegram/bot/wh")
+      end
+
+      it "does NOT auto-register on the implicit Bot.default lazy seed (keeps the broadcast path I/O-free)" do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("TELEGRAM_BOT_TOKEN").and_return("seed-token")
+
+        bot = TelegramBotEngine::Bot.default # lazy-seeds the default from ENV
+
+        expect(TelegramBotEngine.client_for(bot).requests[:setWebhook]).to be_empty
+      end
+
+      it "removes the webhook when a bot is destroyed" do
+        assistant = create(:bot, slug: "assistant")
+
+        assistant.destroy
+
+        # after_destroy invalidates the cached client first, so remove_webhook builds a fresh
+        # one carrying only the deleteWebhook call.
+        expect(TelegramBotEngine.client_for(assistant).requests[:deleteWebhook]).not_to be_empty
+      end
+
+      it "logs (never raises) when the Telegram call fails, so the admin save still succeeds" do
+        allow(TelegramBotEngine::WebhookRegistrar).to receive(:register).and_raise(StandardError, "boom")
+        bot = build(:bot, :default, webhook_secret: "wh")
+
+        expect { bot.save! }.not_to raise_error
+        expect(TelegramBotEngine::Event.where(event_type: "webhook", action: "register_failed")).to exist
+      end
+    end
+
+    it "makes no network call when no base_url is configured (gem suite + unconfigured hosts stay offline)" do
+      bot = create(:bot, :default)
+      expect(TelegramBotEngine.client_for(bot).requests[:setWebhook]).to be_empty
+    end
+
+    it "does not auto-register when auto_register_webhooks is false" do
+      TelegramBotEngine.configure do |c|
+        c.webhook_base_url = "https://example.com"
+        c.auto_register_webhooks = false
+      end
+      bot = create(:bot, :default)
+      expect(TelegramBotEngine.client_for(bot).requests[:setWebhook]).to be_empty
     end
   end
 end

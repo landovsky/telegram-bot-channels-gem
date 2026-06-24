@@ -65,7 +65,8 @@ it can only be made **here**. "Small change" and "must be in the gem" are the sa
 #   slug           :string  not null, unique           # stable handle, e.g. "default", "assistant"
 #   purpose        :string                              # free text for the admin UI
 #   token          :string  not null                    # encrypted at rest (see §6)
-#   webhook_secret :string  not null, unique             # per-bot inbound secret path segment
+#   webhook_id     :string  not null, unique             # stable, NON-secret inbound routing id (URL path segment)
+#   webhook_secret :string  not null, unique             # bearer secret_token — header ONLY, never in a URL/log
 #   active         :boolean not null, default: true
 #   default        :boolean not null, default: false     # exactly one row true
 TelegramBotEngine::Bot.default        # => the default Bot (back-compat anchor)
@@ -108,21 +109,73 @@ TelegramBotEngine::Authorizer.authorized?(username, bot: nil)  # bot: nil ⇒ gl
 ### 3.6 Webhook registrar
 
 ```ruby
-TelegramBotEngine::WebhookRegistrar.register(bot, base_url:)  # setWebhook → "#{base_url}/<mount>/#{bot.webhook_secret}", secret_token: bot.webhook_secret
-TelegramBotEngine::WebhookRegistrar.remove(bot)              # deleteWebhook
-# called from Bot after_save (on activate)/after_destroy (on disable)
-# config.webhook_base_url supplied by the host app
+TelegramBotEngine::WebhookRegistrar.register(bot, base_url: TelegramBotEngine.config.webhook_base_url)
+#   => bot.client.set_webhook(
+#        url:          "#{base_url}#{config.webhook_mount_path}/#{bot.webhook_id}",  # NON-secret routing id
+#        secret_token: bot.webhook_secret)                                           # secret stays in the header
+TelegramBotEngine::WebhookRegistrar.remove(bot)   # => bot.client.delete_webhook
 ```
+
+> **Security (the routing key is NOT the secret).** The URL path carries the non-secret
+> `webhook_id`; the bearer `secret_token` is `webhook_secret` and travels only in the
+> `X-Telegram-Bot-Api-Secret-Token` header. This prevents Rails' request/SQL logging (which
+> records URL paths and bind params verbatim) from leaking the credential — a log reader
+> learns only the routing id, never enough to forge an authenticated delivery.
+
+- **Auto-(un)registration:** `Bot#after_save` registers (when `active?`) or removes (when
+  not); `Bot#after_destroy` removes. Gated on `config.webhook_base_url.present? &&
+  config.auto_register_webhooks` (default `true`). Failures are rescued and logged as a
+  `webhook` / `register_failed` Event, so an admin save never 500s on a Telegram hiccup.
+- **`setWebhook` is idempotent** (overwrites), so re-registering is always safe.
 
 ### 3.7 Inbound dispatcher
 
 ```ruby
-# Gem provides a controller/endpoint the app mounts ONCE, e.g.:
-#   mount TelegramBotEngine::Dispatch, at: "/telegram/bot"
-# It resolves Bot by the :webhook_secret path segment, validates the
-# X-Telegram-Bot-Api-Secret-Token header, then:
-#   controller.dispatch(bot.client, update, request)
-# Per-bot custom commands still live in a host-app controller that includes SubscriberCommands.
+# config/routes.rb (host app) — mount ONCE for ALL bots:
+mount TelegramBotEngine::Dispatch, at: TelegramBotEngine.config.webhook_mount_path  # default "/telegram/bot"
+```
+
+`TelegramBotEngine::Dispatch` is a Rack endpoint. For `POST <mount>/:webhook_id` it:
+
+1. resolves `bot = Bot.active.find_by(webhook_id: …)` (the non-secret path segment) → **404** if unknown;
+2. validates the `X-Telegram-Bot-Api-Secret-Token` header `== bot.webhook_secret`
+   (constant-time) → **403** on mismatch/absent (telegram-bot 0.16 does NOT — see §9);
+3. exposes the Bot record as `request.env["telegram_bot_engine.bot"]`, then calls
+   `config.dispatch_controller.dispatch(bot.client, request.request_parameters, request)` → **200**;
+   → **400** on a malformed JSON body; **503** if `dispatch_controller` is unset.
+
+**Answers to the host-wiring questions:**
+
+- **(1) Replaces, but coexists during migration.** `Dispatch` is the *single* inbound
+  endpoint for **all** bots including the default. It supersedes the per-bot
+  `telegram_webhook` helper. Because `Dispatch` mounts at a *different* path than the
+  helper's token-derived path, the two coexist with **no flag-day**: the default bot keeps
+  flowing through the old route until you re-register it (step 2).
+- **(2) Default-bot migration = one idempotent re-register.** Run
+  `TelegramBotEngine::WebhookRegistrar.register(TelegramBotEngine::Bot.default, base_url:)`
+  (or just save the active default once auto-registration is on). That points the default
+  bot's webhook at `…/telegram/bot/<default.webhook_secret>`; then the old `telegram_webhook`
+  route can be removed.
+- **(3) Reuse your existing controller; one controller for all bots in v1.** Set
+  `config.dispatch_controller = "TelegramWebhookController"` — your current
+  `TelegramWebhookController < Telegram::Bot::UpdatesController` (which already
+  `include`s `SubscriberCommands`) is the dispatch target unchanged; `dispatch(bot.client,
+  update, request)` is the same signature the helper used. The bot is **parameterized**, not
+  selected by controller: identity arrives via `bot.client` + `request.env[
+  "telegram_bot_engine.bot"]`. `SubscriberCommands` reads that env Bot so inbound
+  `/start`·`/stop` create/scope **that bot's** subscriptions (a chat that `/start`s the
+  Assistant becomes an Assistant-owned subscriber). With no env Bot (e.g. the poller), it
+  falls back to the default/nil convention — today's behavior, unchanged.
+
+### 3.9 Host configuration (Phase 3 additions)
+
+```ruby
+TelegramBotEngine.configure do |c|
+  c.webhook_base_url       = "https://devops-telegram.kopernici.cz" # required to register webhooks
+  c.webhook_mount_path     = "/telegram/bot"                        # default; MUST match the Dispatch mount
+  c.dispatch_controller    = "TelegramWebhookController"            # host UpdatesController incl. SubscriberCommands
+  c.auto_register_webhooks = true                                  # default; gates Bot-save auto (un)registration
+end
 ```
 
 ### 3.8 Admin

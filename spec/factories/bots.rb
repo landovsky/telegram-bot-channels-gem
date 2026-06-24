@@ -5,6 +5,7 @@ FactoryBot.define do
     sequence(:name) { |n| "Bot #{n}" }
     sequence(:slug) { |n| "bot-#{n}" }
     sequence(:token) { |n| "token-#{n}" }
+    sequence(:webhook_id) { |n| "whid-#{n}" }
     sequence(:webhook_secret) { |n| "secret-#{n}" }
     active { true }
     default { false }

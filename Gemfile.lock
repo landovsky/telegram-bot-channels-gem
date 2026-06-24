@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    telegram_bot_engine (0.4.0)
+    telegram_bot_engine (0.6.0)
       rails (>= 7.0)
       telegram-bot (~> 0.16)
 

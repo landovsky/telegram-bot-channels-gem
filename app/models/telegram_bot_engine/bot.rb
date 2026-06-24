@@ -24,10 +24,18 @@ module TelegramBotEngine
 
     scope :active, -> { where(active: true) }
 
+    # Transient: set on the implicit ensure_default! seed so a no-`bot:` broadcast/notify
+    # never triggers a synchronous setWebhook from inside the back-compat path.
+    attr_accessor :skip_webhook_autoregister
+
     validates :name, presence: true
     validates :slug, presence: true, uniqueness: true
     validates :token, presence: true
+    # webhook_secret is the bearer credential — it goes ONLY in the X-Telegram-Bot-Api-Secret-Token
+    # header, never in a URL. webhook_id is the stable, NON-secret routing id that appears in the
+    # webhook URL path (so request/SQL logs never leak the secret). See docs/0001 §3.1/§3.6/§3.7.
     validates :webhook_secret, presence: true, uniqueness: true
+    validates :webhook_id, presence: true, uniqueness: true
     # "exactly one row true" has two halves: at most one (demote_other_defaults) and
     # at least one. Without the second half an admin could uncheck "Default" on the
     # only default bot, leaving zero defaults — which makes every no-`bot:` broadcast/
@@ -35,10 +43,12 @@ module TelegramBotEngine
     # the still-present "default" slug. So refuse to clear the last default.
     validate :keep_at_least_one_default
 
-    before_validation :ensure_webhook_secret, on: :create
+    before_validation :ensure_inbound_credentials, on: :create
     before_save :demote_other_defaults, if: -> { default? && will_save_change_to_default? }
     after_save :invalidate_client_cache
+    after_save :sync_webhook
     after_destroy :invalidate_client_cache
+    after_destroy :remove_webhook
 
     class << self
       # The default Bot — the back-compat anchor every no-`bot:` call site resolves to.
@@ -58,13 +68,19 @@ module TelegramBotEngine
         existing = find_by(default: true)
         return existing if existing
 
-        create!(
+        bot = new(
           name: default_seed_name,
           slug: "default",
           token: default_seed_token,
           active: true,
           default: true
         )
+        # This is a lazy seed reachable from the back-compat broadcast/notify path; keep it
+        # free of synchronous Telegram I/O. The host registers the default's webhook explicitly
+        # (admin save, or WebhookRegistrar.register(Bot.default)) — see docs/0001 §3.6.
+        bot.skip_webhook_autoregister = true
+        bot.save!
+        bot
       end
 
       private
@@ -94,8 +110,9 @@ module TelegramBotEngine
 
     private
 
-    def ensure_webhook_secret
+    def ensure_inbound_credentials
       self.webhook_secret = SecureRandom.hex(16) if webhook_secret.blank?
+      self.webhook_id = SecureRandom.hex(16) if webhook_id.blank?
     end
 
     # "exactly one row true": promoting a bot to default demotes whoever held it.
@@ -116,6 +133,45 @@ module TelegramBotEngine
 
     def invalidate_client_cache
       TelegramBotEngine::Registry.invalidate(self)
+    end
+
+    # Auto-(un)register the Telegram webhook on save (docs/0001 §3.6): an active bot gets a
+    # webhook, an inactive one has it removed. Best-effort — a Telegram hiccup is logged, never
+    # raised, so an admin save can't 500. Gated on a configured base_url so the gem's own suite
+    # (and any host without webhook config) makes no network calls.
+    def sync_webhook
+      return unless webhook_autoregister?
+
+      if active?
+        TelegramBotEngine::WebhookRegistrar.register(self)
+      else
+        TelegramBotEngine::WebhookRegistrar.remove(self)
+      end
+    rescue StandardError => e
+      log_webhook_failure(e)
+    end
+
+    def remove_webhook
+      return unless webhook_autoregister?
+
+      TelegramBotEngine::WebhookRegistrar.remove(self)
+    rescue StandardError => e
+      log_webhook_failure(e)
+    end
+
+    def webhook_autoregister?
+      return false if skip_webhook_autoregister
+
+      TelegramBotEngine.config.webhook_base_url.present? &&
+        TelegramBotEngine.config.auto_register_webhooks
+    end
+
+    def log_webhook_failure(error)
+      TelegramBotEngine::Event.log(
+        event_type: "webhook", action: "register_failed",
+        bot_id: id, details: { bot: slug, error: error.message }
+      )
+      Rails.logger.warn("[TelegramBotEngine] webhook sync failed for bot #{slug}: #{error.message}") if defined?(Rails)
     end
   end
 end
