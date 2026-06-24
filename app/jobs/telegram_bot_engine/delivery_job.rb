@@ -5,8 +5,14 @@ module TelegramBotEngine
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
-    def perform(chat_id, text, options = {})
-      Telegram.bot.send_message(
+    # Delivers through the chosen bot's own client (resolved via the registry),
+    # not the process-global Telegram.bot (docs/0001 §3.3). `bot_id` is resolved
+    # to a Bot record; a missing/blank id falls back to the default bot so an
+    # in-flight job enqueued before a rollback still delivers.
+    def perform(bot_id, chat_id, text, options = {})
+      bot = TelegramBotEngine::Bot.find_by(id: bot_id) || TelegramBotEngine::Bot.default
+
+      TelegramBotEngine.client_for(bot).send_message(
         chat_id: chat_id,
         text: text,
         **options.symbolize_keys
@@ -15,7 +21,7 @@ module TelegramBotEngine
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "delivered",
         chat_id: chat_id,
-        details: { text_preview: text.to_s[0, 100] }
+        details: { bot: bot.slug, text_preview: text.to_s[0, 100] }
       )
     rescue Telegram::Bot::Forbidden
       # User blocked the bot - deactivate subscription
@@ -25,7 +31,7 @@ module TelegramBotEngine
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "blocked",
         chat_id: chat_id,
-        details: { text_preview: text.to_s[0, 100] }
+        details: { bot: bot&.slug, text_preview: text.to_s[0, 100] }
       )
     end
   end

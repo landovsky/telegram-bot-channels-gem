@@ -33,6 +33,21 @@ RSpec.configure do |config|
   config.before(:suite) do
     # Run migrations in memory
     ActiveRecord::Schema.define do
+      create_table :telegram_bot_engine_bots, force: true do |t|
+        t.string  :name, null: false
+        t.string  :slug, null: false
+        t.string  :purpose
+        t.string  :token, null: false
+        t.string  :webhook_secret, null: false
+        t.boolean :active, default: true
+        t.boolean :default, default: false
+        t.timestamps
+      end
+
+      add_index :telegram_bot_engine_bots, :slug, unique: true
+      add_index :telegram_bot_engine_bots, :webhook_secret, unique: true
+      add_index :telegram_bot_engine_bots, :active
+
       create_table :telegram_bot_engine_subscriptions, force: true do |t|
         t.bigint :chat_id, null: false
         t.bigint :user_id
@@ -81,5 +96,6 @@ RSpec.configure do |config|
 
   config.after(:each) do
     TelegramBotEngine.reset_config!
+    TelegramBotEngine::Registry.reset!
   end
 end
