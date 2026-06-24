@@ -4,7 +4,9 @@ module TelegramBotEngine
   module Admin
     class SubscriptionsController < BaseController
       def index
-        @subscriptions = Subscription.order(created_at: :desc)
+        @bots = Bot.order(:name)
+        @subscriptions = Subscription.includes(:bot).order(created_at: :desc)
+        @subscriptions = @subscriptions.where(bot_id: params[:bot_id]) if params[:bot_id].present?
       end
 
       def update

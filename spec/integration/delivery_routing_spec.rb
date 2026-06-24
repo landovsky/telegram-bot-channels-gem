@@ -9,17 +9,19 @@ RSpec.describe "Bot-aware delivery routing", type: :model do
 
   around { |example| Telegram::Bot::ClientStub.stub_all! { example.run } }
 
-  it "delivers a broadcast through the chosen bot and through no other bot" do
+  it "delivers a broadcast through the chosen bot, to that bot's own audience, and nowhere else" do
     default_bot = create(:bot, :default, token: "default-token")
     assistant   = create(:bot, slug: "assistant", token: "assistant-token")
-    create(:subscription, chat_id: 555, active: true)
+    create(:subscription, chat_id: 555, active: true, bot: assistant)
+    create(:subscription, chat_id: 888, active: true) # default/legacy subscriber — not the assistant's audience
 
     perform_enqueued_jobs do
       TelegramBotEngine.broadcast("ping", bot: assistant)
     end
 
-    expect(TelegramBotEngine.client_for(assistant).requests[:sendMessage])
-      .to include(hash_including(chat_id: 555, text: "ping"))
+    assistant_sends = TelegramBotEngine.client_for(assistant).requests[:sendMessage]
+    expect(assistant_sends).to include(hash_including(chat_id: 555, text: "ping"))
+    expect(assistant_sends.map { |r| r[:chat_id] }).not_to include(888)
     expect(TelegramBotEngine.client_for(default_bot).requests[:sendMessage]).to be_empty
   end
 

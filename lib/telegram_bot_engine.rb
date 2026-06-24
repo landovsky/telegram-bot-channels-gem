@@ -33,7 +33,7 @@ module TelegramBotEngine
     def broadcast(text, bot: nil, **options)
       bot ||= TelegramBotEngine::Bot.default
       subscriber_count = 0
-      TelegramBotEngine::Subscription.active.find_each do |subscription|
+      TelegramBotEngine::Subscription.active.for_bot(bot).find_each do |subscription|
         TelegramBotEngine::DeliveryJob.perform_later(
           bot.id,
           subscription.chat_id,
@@ -45,6 +45,7 @@ module TelegramBotEngine
 
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "broadcast",
+        bot_id: bot.id,
         details: { bot: bot.slug, subscriber_count: subscriber_count, text_preview: text.to_s[0, 100] }
       )
     end
@@ -57,7 +58,7 @@ module TelegramBotEngine
 
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "notify",
-        chat_id: chat_id,
+        chat_id: chat_id, bot_id: bot.id,
         details: { bot: bot.slug, text_preview: text.to_s[0, 100] }
       )
     end

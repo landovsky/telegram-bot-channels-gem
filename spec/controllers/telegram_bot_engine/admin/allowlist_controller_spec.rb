@@ -63,6 +63,27 @@ RSpec.describe TelegramBotEngine::Admin::AllowlistController, type: :controller 
       expect(response).to redirect_to(admin_allowlist_index_path)
       expect(flash[:alert]).to be_present
     end
+
+    it "creates a per-bot allow entry when a bot scope is chosen (§3.5)" do
+      assistant = create(:bot, slug: "assistant")
+
+      post :create, params: { allowed_user: { username: "scoped", bot_id: assistant.id } }
+
+      expect(TelegramBotEngine::AllowedUser.find_by(username: "scoped").bot_id).to eq(assistant.id)
+    end
+  end
+
+  describe "GET #index scoped by bot" do
+    it "shows only that bot's entries (global entries excluded) when bot_id is given" do
+      assistant = create(:bot, slug: "assistant")
+      create(:allowed_user, username: "scoped_user", bot: assistant)
+      create(:allowed_user, username: "global_user")
+
+      get :index, params: { bot_id: assistant.id }
+
+      expect(response.body).to include("scoped_user")
+      expect(response.body).not_to include("global_user")
+    end
   end
 
   describe "DELETE #destroy" do

@@ -76,6 +76,27 @@ RSpec.describe TelegramBotEngine::Authorizer do
       end
     end
 
+    context "when allowed_usernames is :database and a bot is given (per-bot, §3.5)" do
+      before do
+        TelegramBotEngine.configure { |c| c.allowed_usernames = :database }
+      end
+
+      let(:assistant) { create(:bot, slug: "assistant") }
+      let(:other) { create(:bot, slug: "other") }
+
+      it "authorizes a global entry (nil bot_id) for any bot" do
+        create(:allowed_user, username: "global_admin", bot: nil)
+        expect(described_class.authorized?("global_admin", bot: assistant)).to be true
+        expect(described_class.authorized?("global_admin", bot: other)).to be true
+      end
+
+      it "authorizes a per-bot entry only for that bot" do
+        create(:allowed_user, username: "assistant_only", bot: assistant)
+        expect(described_class.authorized?("assistant_only", bot: assistant)).to be true
+        expect(described_class.authorized?("assistant_only", bot: other)).to be false
+      end
+    end
+
     context "when allowed_usernames is an unknown type" do
       before do
         TelegramBotEngine.configure { |c| c.allowed_usernames = "invalid" }

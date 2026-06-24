@@ -20,17 +20,18 @@ module TelegramBotEngine
 
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "delivered",
-        chat_id: chat_id,
+        chat_id: chat_id, bot_id: bot.id,
         details: { bot: bot.slug, text_preview: text.to_s[0, 100] }
       )
     rescue Telegram::Bot::Forbidden
-      # User blocked the bot - deactivate subscription
-      TelegramBotEngine::Subscription.where(chat_id: chat_id).update_all(active: false)
+      # User blocked this bot - deactivate only *this bot's* subscription for the chat,
+      # not the chat's subscriptions to other bots (docs/0001 §3.4).
+      TelegramBotEngine::Subscription.for_bot(bot).where(chat_id: chat_id).update_all(active: false)
       Rails.logger.info("[TelegramBotEngine] Deactivated subscription for blocked chat: #{chat_id}")
 
       TelegramBotEngine::Event.log(
         event_type: "delivery", action: "blocked",
-        chat_id: chat_id,
+        chat_id: chat_id, bot_id: bot&.id,
         details: { bot: bot&.slug, text_preview: text.to_s[0, 100] }
       )
     end

@@ -1,0 +1,53 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Add Bot</h1>
+</div>
+
+<div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 max-w-2xl">
+  <%= form_with url: telegram_bot_engine.admin_bots_path, method: :post, class: "space-y-4" do %>
+    <div>
+      <label for="bot_name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+      <input type="text" name="bot[name]" id="bot_name" value="<%= @bot.name %>" required
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border"
+             placeholder="Assistant">
+    </div>
+    <div>
+      <label for="bot_slug" class="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+      <input type="text" name="bot[slug]" id="bot_slug" value="<%= @bot.slug %>" required
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border font-mono"
+             placeholder="assistant">
+      <p class="mt-1 text-xs text-gray-500">Stable handle used by the app (e.g. <code>Bot.resolve("assistant")</code>). Cannot collide.</p>
+    </div>
+    <div>
+      <label for="bot_purpose" class="block text-sm font-medium text-gray-700 mb-1">Purpose (optional)</label>
+      <input type="text" name="bot[purpose]" id="bot_purpose" value="<%= @bot.purpose %>"
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border"
+             placeholder="Ops alerts from the assistant">
+    </div>
+    <div>
+      <label for="bot_token" class="block text-sm font-medium text-gray-700 mb-1">Token</label>
+      <input type="password" name="bot[token]" id="bot_token" required autocomplete="off"
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border font-mono"
+             placeholder="123456:ABC-DEF...">
+      <p class="mt-1 text-xs text-gray-500">Stored as-is until ActiveRecord Encryption keys are provisioned (docs/0001 §6). Rotate later from the bot's edit page.</p>
+    </div>
+    <div class="flex items-center space-x-2">
+      <input type="hidden" name="bot[active]" value="0">
+      <input type="checkbox" name="bot[active]" id="bot_active" value="1" <%= "checked" if @bot.active %>
+             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+      <label for="bot_active" class="text-sm text-gray-700">Active</label>
+    </div>
+    <div class="flex items-center space-x-2">
+      <input type="hidden" name="bot[default]" value="0">
+      <input type="checkbox" name="bot[default]" id="bot_default" value="1" <%= "checked" if @bot.default %>
+             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+      <label for="bot_default" class="text-sm text-gray-700">Default bot <span class="text-gray-400">(promoting this demotes the current default)</span></label>
+    </div>
+    <div class="flex items-center space-x-3 pt-2">
+      <button type="submit"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+        Create Bot
+      </button>
+      <%= link_to "Cancel", telegram_bot_engine.admin_bots_path, class: "text-sm text-gray-600 hover:text-gray-900" %>
+    </div>
+  <% end %>
+</div>

@@ -29,6 +29,17 @@
              class="block rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border"
              placeholder="e.g. 12345">
     </div>
+    <% if @bots.any? %>
+      <div>
+        <label for="bot_id" class="block text-sm font-medium text-gray-700 mb-1">Bot</label>
+        <select name="bot_id" id="bot_id" class="block rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border">
+          <option value="">All</option>
+          <% @bots.each do |bot| %>
+            <option value="<%= bot.id %>" <%= "selected" if params[:bot_id].to_s == bot.id.to_s %>><%= bot.name %></option>
+          <% end %>
+        </select>
+      </div>
+    <% end %>
     <div>
       <button type="submit"
               class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -103,11 +114,11 @@
     </div>
     <div class="flex space-x-2">
       <% if @page > 1 %>
-        <%= link_to "Previous", telegram_bot_engine.admin_events_path(type: params[:type], action_name: params[:action_name], chat_id: params[:chat_id], page: @page - 1),
+        <%= link_to "Previous", telegram_bot_engine.admin_events_path(type: params[:type], action_name: params[:action_name], chat_id: params[:chat_id], bot_id: params[:bot_id], page: @page - 1),
               class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
       <% end %>
       <% if @page < @total_pages %>
-        <%= link_to "Next", telegram_bot_engine.admin_events_path(type: params[:type], action_name: params[:action_name], chat_id: params[:chat_id], page: @page + 1),
+        <%= link_to "Next", telegram_bot_engine.admin_events_path(type: params[:type], action_name: params[:action_name], chat_id: params[:chat_id], bot_id: params[:bot_id], page: @page + 1),
               class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" %>
       <% end %>
     </div>

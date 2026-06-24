@@ -28,14 +28,16 @@ RSpec.describe TelegramBotEngine do
     end
 
     context "when a bot is chosen explicitly" do
-      it "tags each enqueued job with that bot id, not the default" do
+      it "tags jobs with that bot id and scopes to that bot's own subscribers" do
         assistant = create(:bot, slug: "assistant")
-        create(:subscription, chat_id: 111, active: true)
+        create(:subscription, chat_id: 111, active: true, bot: assistant)
+        create(:subscription, chat_id: 999, active: true) # default/legacy audience — must be excluded
 
         expect {
           described_class.broadcast("Hi", bot: assistant)
         }.to have_enqueued_job(TelegramBotEngine::DeliveryJob)
           .with(assistant.id, 111, "Hi", {})
+        expect(TelegramBotEngine::DeliveryJob).not_to have_been_enqueued.with(assistant.id, 999, "Hi", {})
       end
     end
 

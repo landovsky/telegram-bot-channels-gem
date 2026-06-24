@@ -1,0 +1,69 @@
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Edit Bot</h1>
+  <p class="mt-1 text-sm text-gray-500 font-mono"><%= @bot.slug %></p>
+</div>
+
+<div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 max-w-2xl mb-6">
+  <%= form_with url: telegram_bot_engine.admin_bot_path(@bot), method: :patch, class: "space-y-4" do %>
+    <div>
+      <label for="bot_name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+      <input type="text" name="bot[name]" id="bot_name" value="<%= @bot.name %>" required
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border">
+    </div>
+    <div>
+      <label for="bot_slug" class="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+      <input type="text" name="bot[slug]" id="bot_slug" value="<%= @bot.slug %>" required
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border font-mono">
+    </div>
+    <div>
+      <label for="bot_purpose" class="block text-sm font-medium text-gray-700 mb-1">Purpose (optional)</label>
+      <input type="text" name="bot[purpose]" id="bot_purpose" value="<%= @bot.purpose %>"
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border">
+    </div>
+    <div class="flex items-center space-x-2">
+      <input type="hidden" name="bot[active]" value="0">
+      <input type="checkbox" name="bot[active]" id="bot_active" value="1" <%= "checked" if @bot.active %>
+             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+      <label for="bot_active" class="text-sm text-gray-700">Active</label>
+    </div>
+    <div class="flex items-center space-x-2">
+      <input type="hidden" name="bot[default]" value="0">
+      <input type="checkbox" name="bot[default]" id="bot_default" value="1" <%= "checked" if @bot.default %>
+             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+      <label for="bot_default" class="text-sm text-gray-700">Default bot</label>
+    </div>
+    <div class="flex items-center space-x-3 pt-2">
+      <button type="submit"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+        Save
+      </button>
+      <%= link_to "Cancel", telegram_bot_engine.admin_bots_path, class: "text-sm text-gray-600 hover:text-gray-900" %>
+    </div>
+  <% end %>
+</div>
+
+<div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 max-w-2xl mb-6">
+  <h2 class="text-sm font-medium text-gray-700 mb-1">Rotate token</h2>
+  <p class="text-xs text-gray-500 mb-4">Replaces the stored token and invalidates the cached client immediately (token-rotation safe). Current token: <span class="font-mono"><%= @bot.token.to_s.length > 4 ? "••••#{@bot.token.to_s.last(4)}" : "set" %></span></p>
+  <%= form_with url: telegram_bot_engine.rotate_token_admin_bot_path(@bot), method: :patch, class: "flex items-end space-x-3" do %>
+    <div class="flex-1">
+      <label for="token" class="block text-sm font-medium text-gray-700 mb-1">New token</label>
+      <input type="password" name="token" id="token" required autocomplete="off"
+             class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2 border font-mono"
+             placeholder="123456:ABC-DEF...">
+    </div>
+    <button type="submit"
+            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+      Rotate
+    </button>
+  <% end %>
+</div>
+
+<% unless @bot.default? %>
+  <div class="max-w-2xl">
+    <%= button_to "Delete this bot", telegram_bot_engine.admin_bot_path(@bot),
+          method: :delete,
+          data: { turbo_confirm: "Delete bot \"#{@bot.name}\" and its subscribers/allowlist?" },
+          class: "inline-flex items-center px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50" %>
+  </div>
+<% end %>

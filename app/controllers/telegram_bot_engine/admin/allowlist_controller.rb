@@ -6,7 +6,9 @@ module TelegramBotEngine
       before_action :require_database_mode!
 
       def index
-        @allowed_users = AllowedUser.order(:username)
+        @bots = Bot.order(:name)
+        @allowed_users = AllowedUser.includes(:bot).order(:username)
+        @allowed_users = @allowed_users.where(bot_id: params[:bot_id]) if params[:bot_id].present?
       end
 
       def create
@@ -25,7 +27,8 @@ module TelegramBotEngine
       private
 
       def allowed_user_params
-        params.require(:allowed_user).permit(:username, :note)
+        # bot_id blank ⇒ a global allow entry that applies to every bot (docs/0001 §3.5).
+        params.require(:allowed_user).permit(:username, :note, :bot_id)
       end
 
       def require_database_mode!

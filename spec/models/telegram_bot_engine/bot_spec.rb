@@ -46,6 +46,24 @@ RSpec.describe TelegramBotEngine::Bot do
         expect(described_class.default).to eq(second)
       end
     end
+
+    context "exactly one row true — the last default must never be cleared" do
+      it "refuses to unset default on the only default bot (the no-bot: back-compat anchor must survive)" do
+        bot = create(:bot, :default)
+
+        expect(bot.update(default: false)).to be false
+        expect(bot.errors[:default]).to be_present
+        expect(bot.reload.default).to be true
+        expect(described_class.default).to eq(bot)
+      end
+
+      it "does not trip the guard when a non-default bot is edited" do
+        create(:bot, :default)
+        assistant = create(:bot, slug: "assistant")
+
+        expect(assistant.update(name: "Renamed")).to be true
+      end
+    end
   end
 
   describe ".resolve" do

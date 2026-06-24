@@ -19,6 +19,27 @@ RSpec.describe TelegramBotEngine::AllowedUser do
       user = build(:allowed_user)
       expect(user).to be_valid
     end
+
+    context "per-bot allowlist — the same username may be allow-listed under different bots" do
+      it "allows the same username globally and scoped to a bot" do
+        assistant = create(:bot, slug: "assistant")
+        create(:allowed_user, username: "tom", bot: nil)
+        scoped = build(:allowed_user, username: "tom", bot: assistant)
+        expect(scoped).to be_valid
+      end
+    end
+  end
+
+  describe ".for_bot" do
+    it "returns global (nil bot_id) entries plus that bot's own entries" do
+      assistant = create(:bot, slug: "assistant")
+      _other = create(:bot, slug: "other")
+      global = create(:allowed_user, username: "global", bot: nil)
+      mine = create(:allowed_user, username: "mine", bot: assistant)
+      create(:allowed_user, username: "theirs", bot: _other)
+
+      expect(described_class.for_bot(assistant)).to match_array([global, mine])
+    end
   end
 
   describe "attributes" do
