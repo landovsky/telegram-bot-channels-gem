@@ -16,6 +16,8 @@
           <div class="flex space-x-4">
             <%= link_to "Dashboard", telegram_bot_engine.admin_dashboard_path,
                   class: "px-3 py-2 rounded-md text-sm font-medium #{request.path == telegram_bot_engine.admin_dashboard_path || request.path == telegram_bot_engine.admin_root_path ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
+            <%= link_to "Bots", telegram_bot_engine.admin_bots_path,
+                  class: "px-3 py-2 rounded-md text-sm font-medium #{request.path.include?('bots') ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
             <%= link_to "Subscriptions", telegram_bot_engine.admin_subscriptions_path,
                   class: "px-3 py-2 rounded-md text-sm font-medium #{request.path.include?('subscriptions') ? 'text-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" %>
             <% if TelegramBotEngine.config.allowed_usernames == :database %>

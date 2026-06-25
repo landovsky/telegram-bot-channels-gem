@@ -58,6 +58,17 @@ RSpec.describe TelegramBotEngine::Admin::EventsController, type: :controller do
       expect(response.body).not_to include("bob")
     end
 
+    it "filters by bot (§3.8)" do
+      assistant = create(:bot, slug: "assistant")
+      TelegramBotEngine::Event.create!(event_type: "delivery", action: "broadcast", username: "for_assistant", bot_id: assistant.id)
+      TelegramBotEngine::Event.create!(event_type: "delivery", action: "broadcast", username: "for_default")
+
+      get :index, params: { bot_id: assistant.id }
+
+      expect(response.body).to include("for_assistant")
+      expect(response.body).not_to include("for_default")
+    end
+
     it "paginates results" do
       55.times do |i|
         TelegramBotEngine::Event.create!(event_type: "command", action: "start", username: "user_#{i}")

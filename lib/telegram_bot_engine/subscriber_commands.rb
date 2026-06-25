@@ -12,7 +12,7 @@ module TelegramBotEngine
     # /start - create subscription if authorized
     def start!(*)
       subscription = TelegramBotEngine::Subscription.find_or_initialize_by(
-        chat_id: chat["id"]
+        chat_id: chat["id"], bot_id: current_bot&.id
       )
       subscription.assign_attributes(
         user_id: from["id"],
@@ -24,7 +24,7 @@ module TelegramBotEngine
 
       TelegramBotEngine::Event.log(
         event_type: "command", action: "start",
-        chat_id: chat["id"], username: from["username"]
+        chat_id: chat["id"], username: from["username"], bot_id: current_bot&.id
       )
 
       welcome = TelegramBotEngine.config.welcome_message % {
@@ -36,12 +36,12 @@ module TelegramBotEngine
 
     # /stop - deactivate subscription
     def stop!(*)
-      subscription = TelegramBotEngine::Subscription.find_by(chat_id: chat["id"])
+      subscription = TelegramBotEngine::Subscription.find_by(chat_id: chat["id"], bot_id: current_bot&.id)
       subscription&.update(active: false)
 
       TelegramBotEngine::Event.log(
         event_type: "command", action: "stop",
-        chat_id: chat["id"], username: from["username"]
+        chat_id: chat["id"], username: from["username"], bot_id: current_bot&.id
       )
 
       respond_with :message, text: "You've been unsubscribed. Send /start to resubscribe."
@@ -51,7 +51,7 @@ module TelegramBotEngine
     def help!(*)
       TelegramBotEngine::Event.log(
         event_type: "command", action: "help",
-        chat_id: chat["id"], username: from["username"]
+        chat_id: chat["id"], username: from["username"], bot_id: current_bot&.id
       )
 
       respond_with :message, text: "📋 *Available Commands*\n\n#{available_commands_text}", parse_mode: "Markdown"
@@ -60,15 +60,25 @@ module TelegramBotEngine
     private
 
     def authorize_user!
-      return if TelegramBotEngine::Authorizer.authorized?(from["username"])
+      return if TelegramBotEngine::Authorizer.authorized?(from["username"], bot: current_bot)
 
       TelegramBotEngine::Event.log(
         event_type: "auth_failure", action: "unauthorized",
-        chat_id: chat["id"], username: from["username"]
+        chat_id: chat["id"], username: from["username"], bot_id: current_bot&.id
       )
 
       respond_with :message, text: TelegramBotEngine.config.unauthorized_message
       throw :abort
+    end
+
+    # The Bot this inbound update arrived for, set by TelegramBotEngine::Dispatch in the
+    # request env (docs/0001 §3.7). nil when there is no inbound request context (e.g. the
+    # poller, or a host controller without webhook_request) → default/global behavior, unchanged.
+    def current_bot
+      return unless respond_to?(:webhook_request)
+
+      request = webhook_request
+      request && request.env["telegram_bot_engine.bot"]
     end
 
     # Auto-generates command list from public methods ending with !

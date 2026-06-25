@@ -20,10 +20,12 @@ module TelegramBotEngine
           return
         end
 
+        @bots = Bot.order(:name)
         @events = Event.recent
         @events = @events.by_type(params[:type]) if params[:type].present?
         @events = @events.by_action(params[:action_name]) if params[:action_name].present?
         @events = @events.by_chat_id(params[:chat_id]) if params[:chat_id].present?
+        @events = @events.by_bot(params[:bot_id]) if params[:bot_id].present?
 
         @total_count = @events.count
         @page = [params[:page].to_i, 1].max
@@ -39,6 +41,7 @@ module TelegramBotEngine
                   id: e.id,
                   event_type: e.event_type,
                   action: e.action,
+                  bot_id: e.bot_id,
                   chat_id: e.chat_id,
                   username: e.username,
                   details: e.details,

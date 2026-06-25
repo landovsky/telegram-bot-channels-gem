@@ -189,6 +189,62 @@ RSpec.describe TelegramBotEngine::SubscriberCommands do
     end
   end
 
+  context "when an inbound update is dispatched for a specific bot (Phase 3 §3.7)" do
+    let(:assistant) { create(:bot, slug: "assistant") }
+
+    # A controller that, unlike the default harness, exposes webhook_request (as the real
+    # Telegram::Bot::UpdatesController does) carrying the Dispatch-resolved Bot in its env.
+    let(:bot_aware_controller_class) do
+      Class.new do
+        def self.before_action(*); end
+
+        include TelegramBotEngine::SubscriberCommands
+
+        attr_accessor :chat_data, :from_data, :responses, :webhook_request
+
+        def initialize(chat_data: {}, from_data: {}, env: {})
+          @chat_data = chat_data
+          @from_data = from_data
+          @responses = []
+          @webhook_request = Struct.new(:env).new(env)
+        end
+
+        def chat = chat_data
+        def from = from_data
+        def respond_with(_type, **options) = (@responses << options)
+      end
+    end
+
+    let(:controller) do
+      bot_aware_controller_class.new(
+        chat_data: chat, from_data: authorized_from,
+        env: { "telegram_bot_engine.bot" => assistant }
+      )
+    end
+
+    it "creates a subscription OWNED by the dispatched bot, not the default audience" do
+      controller.start!
+
+      sub = TelegramBotEngine::Subscription.last
+      expect(sub.bot_id).to eq(assistant.id)
+    end
+
+    it "tags the start event with the dispatched bot" do
+      controller.start!
+      expect(TelegramBotEngine::Event.last.bot_id).to eq(assistant.id)
+    end
+
+    it "stops only the dispatched bot's subscription, leaving the chat's default-bot sub intact" do
+      assistant_sub = create(:subscription, chat_id: chat["id"], bot: assistant, active: true)
+      default_sub   = create(:subscription, chat_id: chat["id"], active: true) # nil bot_id (default audience)
+
+      controller.stop!
+
+      expect(assistant_sub.reload.active).to be false
+      expect(default_sub.reload.active).to be true
+    end
+  end
+
   describe "#available_commands_text (private)" do
     let(:controller) { controller_class.new(chat_data: chat, from_data: authorized_from) }
 

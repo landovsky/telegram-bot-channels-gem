@@ -1,8 +1,8 @@
 PATH
   remote: .
   specs:
-    telegram_bot_engine (0.3.4)
-      rails (>= 7.0)
+    telegram_bot_engine (0.6.0)
+      rails (>= 7.0, < 9.0)
       telegram-bot (~> 0.16)
 
 GEM
@@ -239,7 +239,7 @@ GEM
       activesupport (>= 4.0, < 8.1)
       httpclient (~> 2.7)
     thor (1.5.0)
-    timeout (0.6.0)
+    timeout (0.6.1)
     tsort (0.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -269,4 +269,4 @@ DEPENDENCIES
   telegram_bot_engine!
 
 BUNDLED WITH
-   2.5.22
+  4.0.7

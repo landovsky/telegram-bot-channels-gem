@@ -41,6 +41,21 @@ RSpec.describe TelegramBotEngine::Admin::DashboardController, type: :controller 
       expect(response).to be_successful
     end
 
+    context "when bots-as-data rows exist (multi-bot dashboard, §3.8)" do
+      it "lists each bot with its own active subscriber count instead of the single-bot card" do
+        default_bot = create(:bot, :default, name: "Primary")
+        assistant = create(:bot, slug: "assistant", name: "Assistant")
+        create(:subscription, bot: assistant, active: true)
+        create(:subscription, bot: default_bot, active: true)
+
+        get :show
+
+        expect(response.body).to include("Primary")
+        expect(response.body).to include("Assistant")
+        expect(response.body).to include("assistant") # slug rendered
+      end
+    end
+
     context "when admin is disabled" do
       before do
         TelegramBotEngine.configure { |c| c.admin_enabled = false }

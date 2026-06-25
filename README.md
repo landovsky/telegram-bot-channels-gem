@@ -91,6 +91,8 @@ Rails.application.routes.draw do
 end
 ```
 
+> Running more than one bot? Replace `telegram_webhook` with the engine's inbound dispatcher — see [Multiple bots](#multiple-bots).
+
 ### Set webhook
 
 These rake tasks come from the `telegram-bot` gem:
@@ -182,6 +184,71 @@ TelegramBotEngine::Event.purge_old!
 ```
 
 Disable event logging entirely with `config.event_logging = false`.
+
+## Multiple bots
+
+The engine manages many Telegram bots from one Rails host. Everything keyed by a Telegram bot identity — subscribers, allowlist, delivery, and inbound routing — is scoped per bot. Existing single-bot setups keep working unchanged: every call without a `bot:` argument targets the **default bot**, which is seeded automatically from your existing `telegram.bot` credentials (or `TELEGRAM_BOT_TOKEN`).
+
+### The Bot model
+
+Each bot is a persisted `TelegramBotEngine::Bot` record (token, slug, and per-bot webhook credentials). Manage them in the admin UI, a seed, or the console:
+
+```ruby
+TelegramBotEngine::Bot.create!(
+  name: "Support bot",
+  slug: "support",
+  token: Rails.application.credentials.dig(:telegram, :support_bot, :token),
+  active: true
+)
+
+TelegramBotEngine::Bot.default            # the back-compat anchor (auto-seeded on first use)
+TelegramBotEngine::Bot.resolve("support") # look up by slug
+bot.client                                # this bot's memoized Telegram::Bot::Client
+```
+
+`webhook_id` (the non-secret id that appears in the webhook URL) and `webhook_secret` (the bearer credential, sent only in the `X-Telegram-Bot-Api-Secret-Token` header) are generated automatically.
+
+### Bot-aware delivery
+
+```ruby
+support = TelegramBotEngine::Bot.resolve("support")
+
+# Broadcast / notify through a specific bot's own client
+TelegramBotEngine.broadcast("Support is online", bot: support)
+TelegramBotEngine.notify(chat_id: 123456789, text: "Ticket updated", bot: support)
+
+# Omit bot: to target the default bot (unchanged single-bot behavior)
+TelegramBotEngine.broadcast("Deployment complete!")
+```
+
+Subscribers and allowlist entries are scoped per bot: a user who blocks the support bot is deactivated only for that bot, and a per-bot allowlist entry never escalates into a global one.
+
+### Inbound updates for multiple bots
+
+`telegram-bot`'s `telegram_webhook` route serves a single bot. For multiple bots, mount the engine's inbound dispatcher **once** — it resolves the target bot from the URL, validates the secret-token header, then hands off to your `UpdatesController`:
+
+```ruby
+# config/initializers/telegram_bot_engine.rb
+TelegramBotEngine.configure do |config|
+  config.webhook_base_url    = "https://app.example.com"     # host public HTTPS base
+  config.webhook_mount_path  = "/telegram/bot"               # must match the mount below
+  config.dispatch_controller = "TelegramWebhookController"    # your UpdatesController (incl. SubscriberCommands)
+  config.auto_register_webhooks = true                       # (un)register webhooks on Bot save/destroy
+end
+```
+
+```ruby
+# config/routes.rb
+mount TelegramBotEngine::Dispatch, at: "/telegram/bot"
+```
+
+With `webhook_base_url` set and `auto_register_webhooks` enabled, saving an active `Bot` registers its Telegram webhook (`<base_url>/telegram/bot/<webhook_id>`, secret in the header) and deactivating it removes the webhook — no manual `set_webhook` per bot. You can also (re)register explicitly:
+
+```ruby
+TelegramBotEngine::WebhookRegistrar.register(TelegramBotEngine::Bot.resolve("support"))
+```
+
+Unlike `telegram-bot` 0.16, the dispatcher validates the `X-Telegram-Bot-Api-Secret-Token` header (constant-time) on every inbound request, so only Telegram can drive your bots.
 
 ## Requirements
 

@@ -26,6 +26,17 @@ RSpec.describe TelegramBotEngine::Admin::SubscriptionsController, type: :control
       # Newer should appear first (ordered by created_at desc)
       expect(body.index("newer_user")).to be < body.index("older_user")
     end
+
+    it "scopes the listing to one bot when bot_id is given (§3.8)" do
+      assistant = create(:bot, slug: "assistant")
+      create(:subscription, username: "assistant_sub", bot: assistant)
+      create(:subscription, username: "legacy_sub")
+
+      get :index, params: { bot_id: assistant.id }
+
+      expect(response.body).to include("assistant_sub")
+      expect(response.body).not_to include("legacy_sub")
+    end
   end
 
   describe "PATCH #update" do

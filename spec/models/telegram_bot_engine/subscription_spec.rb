@@ -8,11 +8,20 @@ RSpec.describe TelegramBotEngine::Subscription do
       expect(subscription.errors[:chat_id]).to include("can't be blank")
     end
 
-    it "requires unique chat_id" do
+    it "requires chat_id unique within a bot" do
       create(:subscription, chat_id: 12345)
       duplicate = build(:subscription, chat_id: 12345)
       expect(duplicate).not_to be_valid
       expect(duplicate.errors[:chat_id]).to include("has already been taken")
+    end
+
+    context "per-bot subscribers — the same chat may subscribe to more than one bot" do
+      it "allows the same chat_id under a different bot" do
+        assistant = create(:bot, slug: "assistant")
+        create(:subscription, chat_id: 12345) # default/legacy audience (nil bot_id)
+        cross_bot = build(:subscription, chat_id: 12345, bot: assistant)
+        expect(cross_bot).to be_valid
+      end
     end
 
     it "is valid with required attributes" do
@@ -28,6 +37,26 @@ RSpec.describe TelegramBotEngine::Subscription do
         _inactive = create(:subscription, active: false)
 
         expect(described_class.active).to eq([active])
+      end
+    end
+
+    describe ".for_bot" do
+      it "scopes to a non-default bot's own subscribers only" do
+        assistant = create(:bot, slug: "assistant")
+        mine = create(:subscription, chat_id: 1, bot: assistant)
+        _legacy = create(:subscription, chat_id: 2) # nil bot_id
+        expect(described_class.for_bot(assistant)).to eq([mine])
+      end
+
+      context "back-compat — nil-bot_id subscribers belong to the default bot" do
+        it "includes legacy nil-bot_id rows alongside the default bot's own rows" do
+          default_bot = create(:bot, :default)
+          legacy = create(:subscription, chat_id: 1) # nil bot_id (pre-multi-bot)
+          owned  = create(:subscription, chat_id: 2, bot: default_bot)
+          create(:bot, slug: "assistant").tap { |a| create(:subscription, chat_id: 3, bot: a) }
+
+          expect(described_class.for_bot(default_bot)).to match_array([legacy, owned])
+        end
       end
     end
   end

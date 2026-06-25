@@ -3,46 +3,38 @@
 RSpec.describe TelegramBotEngine::DeliveryJob do
   include ActiveJob::TestHelper
 
-  let(:bot_client) { instance_double("Telegram::Bot::Client") }
+  # Use telegram-bot's real ClientStub seam (not a hand-rolled double) so the job
+  # exercises the same resolution path production does: a per-bot client from the
+  # registry, never the process-global Telegram.bot.
+  around { |example| Telegram::Bot::ClientStub.stub_all! { example.run } }
 
-  before do
-    allow(Telegram).to receive(:bot).and_return(bot_client)
-  end
+  let(:bot) { create(:bot, :default) }
 
   describe "#perform" do
-    it "sends a message via Telegram bot client" do
-      expect(bot_client).to receive(:send_message).with(
-        chat_id: 12345,
-        text: "Hello!"
-      )
+    it "delivers through the bot's own client rather than the global Telegram.bot" do
+      described_class.new.perform(bot.id, 12345, "Hello!")
 
-      described_class.new.perform(12345, "Hello!")
+      expect(TelegramBotEngine.client_for(bot).requests[:sendMessage])
+        .to include(hash_including(chat_id: 12345, text: "Hello!"))
     end
 
-    it "passes additional options" do
-      expect(bot_client).to receive(:send_message).with(
-        chat_id: 12345,
-        text: "Hello!",
-        parse_mode: "Markdown"
-      )
+    it "passes and symbolizes additional options" do
+      described_class.new.perform(bot.id, 12345, "Test", { "parse_mode" => "HTML" })
 
-      described_class.new.perform(12345, "Hello!", { "parse_mode" => "Markdown" })
+      expect(TelegramBotEngine.client_for(bot).requests[:sendMessage])
+        .to include(hash_including(chat_id: 12345, text: "Test", parse_mode: "HTML"))
     end
 
-    it "symbolizes option keys" do
-      expect(bot_client).to receive(:send_message).with(
-        chat_id: 12345,
-        text: "Test",
-        parse_mode: "HTML"
-      )
+    it "falls back to the default bot when bot_id is missing (in-flight job across a rollback)" do
+      bot # ensure a default exists
+      described_class.new.perform(nil, 12345, "Hello!")
 
-      described_class.new.perform(12345, "Test", { "parse_mode" => "HTML" })
+      expect(TelegramBotEngine.client_for(TelegramBotEngine::Bot.default).requests[:sendMessage])
+        .to include(hash_including(chat_id: 12345, text: "Hello!"))
     end
 
     it "logs a delivered event" do
-      allow(bot_client).to receive(:send_message)
-
-      described_class.new.perform(12345, "Hello!")
+      described_class.new.perform(bot.id, 12345, "Hello!")
 
       event = TelegramBotEngine::Event.last
       expect(event.event_type).to eq("delivery")
@@ -50,27 +42,28 @@ RSpec.describe TelegramBotEngine::DeliveryJob do
       expect(event.chat_id).to eq(12345)
     end
 
-    context "when user blocked the bot" do
+    context "when the user blocked the bot" do
       before do
-        allow(bot_client).to receive(:send_message).and_raise(Telegram::Bot::Forbidden, "bot was blocked")
+        # Stub the cached client instance the job will reuse (same bot id).
+        allow(TelegramBotEngine.client_for(bot))
+          .to receive(:send_message).and_raise(Telegram::Bot::Forbidden, "bot was blocked")
       end
 
       it "deactivates the subscription" do
         sub = create(:subscription, chat_id: 12345, active: true)
 
-        described_class.new.perform(12345, "Hello!")
+        described_class.new.perform(bot.id, 12345, "Hello!")
 
-        sub.reload
-        expect(sub.active).to be false
+        expect(sub.reload.active).to be false
       end
 
-      it "handles missing subscription gracefully" do
-        expect { described_class.new.perform(99999, "Hello!") }.not_to raise_error
+      it "handles a missing subscription gracefully" do
+        expect { described_class.new.perform(bot.id, 99999, "Hello!") }.not_to raise_error
       end
 
       it "logs a blocked event" do
         create(:subscription, chat_id: 12345, active: true)
-        described_class.new.perform(12345, "Hello!")
+        described_class.new.perform(bot.id, 12345, "Hello!")
 
         event = TelegramBotEngine::Event.last
         expect(event.event_type).to eq("delivery")
@@ -85,10 +78,10 @@ RSpec.describe TelegramBotEngine::DeliveryJob do
       expect(described_class.new.queue_name).to eq("default")
     end
 
-    it "enqueues the job" do
+    it "enqueues the job with the bot id first" do
       expect {
-        described_class.perform_later(12345, "Hello!", {})
-      }.to have_enqueued_job(described_class)
+        described_class.perform_later(bot.id, 12345, "Hello!", {})
+      }.to have_enqueued_job(described_class).with(bot.id, 12345, "Hello!", {})
     end
   end
 end
