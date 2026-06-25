@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the gem is pre-1.0, minor bumps may widen the API in backward-compatible ways.
 
+## [0.6.1] - 2026-06-25
+
+### Added
+- **Bot column in the events admin table** — the `/telegram/admin/events` table now shows the bot name per row (mapped from `event.bot_id`), instead of leaving bot identity buried in the Details JSON. Command events with no bot (e.g. `start`/`stop`/`help`) render `-`.
+
+### Changed
+- The redundant `bot` key is dropped from the events Details JSON column now that the bot is shown in its own column.
+
 ## [0.6.0] - 2026-06-25
 
 ### Added
